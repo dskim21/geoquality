@@ -43,3 +43,50 @@ export async function validateCsvWithBackend(
 
     return response.json()
 }
+
+export interface BackendGeoJsonValidationResult {
+    qualityScore: number
+    totalFeatures: number
+    validFeatures: number
+    invalidFeatures: number
+
+    errorTypes: {
+        geometryMissing: number
+        duplicateGeometry: number
+        missingValue: number
+    }
+
+    errors: Array<{
+        featureIndex: number
+        errorType: string
+        message: string
+    }>
+}
+
+// GeoJSON 파일을 FastAPI 백엔드로 전송해 품질검사 실행
+export async function validateGeoJsonWithBackend(
+    file: File,
+): Promise<BackendGeoJsonValidationResult> {
+    const formData = new FormData()
+
+    formData.append('file', file)
+
+    const response = await fetch(
+        `${API_BASE_URL}/api/validate/geojson`,
+        {
+            method: 'POST',
+            body: formData,
+        },
+    )
+
+    if (!response.ok) {
+        const errorBody = await response.json().catch(() => null)
+
+        throw new Error(
+            errorBody?.detail ??
+            'GeoJSON 백엔드 검증 요청 중 오류가 발생했습니다.',
+        )
+    }
+
+    return response.json()
+}

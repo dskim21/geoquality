@@ -14,7 +14,12 @@ import { downloadCsvQualityReport } from '../../utils/csvExport'
 import { QualityOverviewCards } from '../dashboard/QualityOverviewCards'
 import { ErrorTypeChart } from '../dashboard/ErrorTypeChart'
 import { GeoJsonQualityOverviewCards } from '../dashboard/GeoJsonQualityOverviewCards'
-import { validateCsvWithBackend, type BackendCsvValidationResult } from '../../api/validateApi'
+import {
+    validateCsvWithBackend,
+    validateGeoJsonWithBackend,
+    type BackendCsvValidationResult,
+    type BackendGeoJsonValidationResult,
+} from '../../api/validateApi'
 
 // 파일 확장자를 확인해서 지원 가능한 형식인지 검사
 function getFileExtension(fileName: string): SupportedFileType | null {
@@ -61,8 +66,67 @@ export function FileUploadCard() {
         useState<BackendCsvValidationResult
             | null>(null)
 
+    const [backendGeoJsonResult, setBackendGeoJsonResult] =
+        useState<BackendGeoJsonValidationResult | null>(null)
+
     // 백엔드 요청 중 로딩 상태
     const [isBackendValidating, setIsBackendValidating] = useState(false)
+
+    // 품질검사 실행 엔진 선택
+    const [validationMode, setValidationMode] =
+        useState<'local' | 'fastapi'>('local')
+
+    {
+        backendGeoJsonResult && (
+            <div className="mt-5 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                <h3 className="font-semibold text-sky-800">
+                    FastAPI GeoJSON Validation Result
+                </h3>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                    <div>
+                        <p className="text-xs text-sky-700">
+                            Quality Score
+                        </p>
+
+                        <p className="text-2xl font-black text-sky-900">
+                            {backendGeoJsonResult.qualityScore}
+                        </p>
+                    </div>
+
+                    <div>
+                        <p className="text-xs text-sky-700">
+                            Total Features
+                        </p>
+
+                        <p className="text-2xl font-black text-sky-900">
+                            {backendGeoJsonResult.totalFeatures}
+                        </p>
+                    </div>
+
+                    <div>
+                        <p className="text-xs text-sky-700">
+                            Valid Features
+                        </p>
+
+                        <p className="text-2xl font-black text-sky-900">
+                            {backendGeoJsonResult.validFeatures}
+                        </p>
+                    </div>
+
+                    <div>
+                        <p className="text-xs text-sky-700">
+                            Invalid Features
+                        </p>
+
+                        <p className="text-2xl font-black text-sky-900">
+                            {backendGeoJsonResult.invalidFeatures}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        )
+    }
 
     // GeoJSON 오류 목록을 ErrorTypeChart에서 사용할 수 있는 형태로 변환
     const geoJsonErrorRows = geoJsonSummary
@@ -156,6 +220,7 @@ export function FileUploadCard() {
         setErrorMessage('')
         setSelectedRawFile(null)
         setBackendResult(null)
+        setBackendGeoJsonResult(null)
         setIsBackendValidating(false)
     }
 
@@ -179,6 +244,35 @@ export function FileUploadCard() {
                 error instanceof Error
                     ? error.message
                     : '백엔드 검증 중 오류가 발생했습니다.',
+            )
+        } finally {
+            setIsBackendValidating(false)
+        }
+    }
+
+    async function handleGeoJsonBackendValidation() {
+        if (!selectedRawFile || selectedFile?.type !== 'geojson') {
+            setErrorMessage(
+                'GeoJSON 파일만 백엔드 검증을 실행할 수 있습니다.',
+            )
+            return
+        }
+
+        try {
+            setIsBackendValidating(true)
+            setErrorMessage('')
+
+            const result =
+                await validateGeoJsonWithBackend(selectedRawFile)
+
+            setBackendGeoJsonResult(result)
+        } catch (error) {
+            setBackendGeoJsonResult(null)
+
+            setErrorMessage(
+                error instanceof Error
+                    ? error.message
+                    : 'GeoJSON 백엔드 검증 중 오류가 발생했습니다.',
             )
         } finally {
             setIsBackendValidating(false)
@@ -239,6 +333,49 @@ export function FileUploadCard() {
                     >
                         <XCircle className="h-5 w-5" />
                     </button>
+                </div>
+            )}
+
+            {/* 품질검사 엔진 선택 */}
+            {selectedFile && (
+                <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm font-semibold text-slate-900">
+                        Validation Engine
+                    </p>
+
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <button
+                            type="button"
+                            onClick={() => setValidationMode('local')}
+                            className={[
+                                'rounded-xl border px-4 py-3 text-left text-sm transition',
+                                validationMode === 'local'
+                                    ? 'border-sky-300 bg-sky-50 text-sky-800'
+                                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+                            ].join(' ')}
+                        >
+                            <p className="font-semibold">Local Validation</p>
+                            <p className="mt-1 text-xs">
+                                브라우저에서 즉시 품질검사를 실행합니다.
+                            </p>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setValidationMode('fastapi')}
+                            className={[
+                                'rounded-xl border px-4 py-3 text-left text-sm transition',
+                                validationMode === 'fastapi'
+                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+                            ].join(' ')}
+                        >
+                            <p className="font-semibold">FastAPI Validation</p>
+                            <p className="mt-1 text-xs">
+                                백엔드 Validation Engine으로 파일을 검증합니다.
+                            </p>
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -584,6 +721,56 @@ export function FileUploadCard() {
                 </div>
             )}
 
+            {backendGeoJsonResult && (
+                <div className="mt-5 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                    <h3 className="font-semibold text-sky-800">
+                        FastAPI GeoJSON Validation Result
+                    </h3>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                        <div>
+                            <p className="text-xs text-sky-700">
+                                Quality Score
+                            </p>
+
+                            <p className="text-2xl font-black text-sky-900">
+                                {backendGeoJsonResult.qualityScore}
+                            </p>
+                        </div>
+
+                        <div>
+                            <p className="text-xs text-sky-700">
+                                Total Features
+                            </p>
+
+                            <p className="text-2xl font-black text-sky-900">
+                                {backendGeoJsonResult.totalFeatures}
+                            </p>
+                        </div>
+
+                        <div>
+                            <p className="text-xs text-sky-700">
+                                Valid Features
+                            </p>
+
+                            <p className="text-2xl font-black text-sky-900">
+                                {backendGeoJsonResult.validFeatures}
+                            </p>
+                        </div>
+
+                        <div>
+                            <p className="text-xs text-sky-700">
+                                Invalid Features
+                            </p>
+
+                            <p className="text-2xl font-black text-sky-900">
+                                {backendGeoJsonResult.invalidFeatures}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* 에러 메시지 */}
             {errorMessage && (
                 <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
@@ -591,16 +778,28 @@ export function FileUploadCard() {
                 </p>
             )}
 
-            {/* 백엔드 연결 전까지는 선택된 파일 여부만 기준으로 버튼 활성화 */}
-            <button
-                type="button"
-                onClick={handleBackendValidation}
-                disabled={!selectedFile || isBackendValidating}
-                className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-500 px-5 py-3 font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
-            >
-                <PlayCircle className="h-5 w-5" />
-                {isBackendValidating ? '백엔드 검증 중...' : 'FastAPI 품질검사 실행'}
-            </button>
+            {validationMode === 'fastapi' && (
+                <button
+                    type="button"
+                    onClick={() => {
+                        if (selectedFile?.type === 'csv') {
+                            handleBackendValidation()
+                            return
+                        }
+
+                        if (selectedFile?.type === 'geojson' || selectedFile?.type === 'json') {
+                            handleGeoJsonBackendValidation()
+                        }
+                    }}
+                    disabled={!selectedFile || isBackendValidating}
+                    className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-500 px-5 py-3 font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                >
+                    <PlayCircle className="h-5 w-5" />
+                    {isBackendValidating
+                        ? '백엔드 검증 중...'
+                        : 'FastAPI 품질검사 실행'}
+                </button>
+            )}
         </div>
     )
 }
