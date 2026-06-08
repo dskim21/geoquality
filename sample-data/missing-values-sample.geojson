@@ -1,0 +1,31 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "point-001",
+        "name": "",
+        "district": "Seongdong-gu",
+        "category": "park"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0374, 37.5446]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "point-002",
+        "name": "Namsan Park",
+        "district": null,
+        "category": "park"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [126.9882, 37.5512]
+      }
+    }
+  ]
+}

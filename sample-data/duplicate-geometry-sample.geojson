@@ -1,0 +1,27 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "point-001",
+        "name": "Seoul Forest A"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0374, 37.5446]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "point-002",
+        "name": "Seoul Forest Duplicate"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0374, 37.5446]
+      }
+    }
+  ]
+}

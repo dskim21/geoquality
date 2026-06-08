@@ -1,0 +1,24 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "valid-001",
+        "name": "Valid Point"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0374, 37.5446]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "invalid-001",
+        "name": "Missing Geometry"
+      },
+      "geometry": null
+    }
+  ]
+}

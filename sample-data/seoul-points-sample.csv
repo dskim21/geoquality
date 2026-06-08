@@ -1,0 +1,4 @@
+id,name,district,latitude,longitude,category
+point-001,Seoul Forest,Seongdong-gu,37.5446,127.0374,park
+point-002,Namsan Park,Jung-gu,37.5512,126.9882,park
+point-003,Invalid Point,Unknown,999,999,error

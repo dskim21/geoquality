@@ -1,0 +1,32 @@
+{
+  "type": "FeatureCollection",
+  "name": "seoul_parks_sample",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "park-001",
+        "name": "Seoul Forest",
+        "district": "Seongdong-gu",
+        "category": "park"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0374, 37.5446]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "park-002",
+        "name": "Namsan Park",
+        "district": "Jung-gu",
+        "category": "park"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [126.9882, 37.5512]
+      }
+    }
+  ]
+}
