@@ -20,6 +20,12 @@ import {
     type BackendCsvValidationResult,
     type BackendGeoJsonValidationResult,
 } from '../../api/validateApi'
+import {
+    analyzeClusters,
+    convertClusterResultToGeoJson,
+    type ClusterAnalysisResult,
+    type ClusterInputPoint,
+} from '../../utils/spatialCluster'
 
 // 파일 확장자를 확인해서 지원 가능한 형식인지 검사
 function getFileExtension(fileName: string): SupportedFileType | null {
@@ -57,6 +63,10 @@ export function FileUploadCard() {
 
     // CSV 파일을 프론트에서 파싱한 요약 정보
     const [csvSummary, setCsvSummary] = useState<ParsedCsvSummary | null>(null)
+
+    // CSV 정상 좌표 기반 클러스터 분석 결과
+    const [clusterResult, setClusterResult] =
+        useState<ClusterAnalysisResult | null>(null)
 
     // 백엔드로 전송할 원본 파일 객체
     const [selectedRawFile, setSelectedRawFile] = useState<File | null>(null)
@@ -197,7 +207,20 @@ export function FileUploadCard() {
             try {
                 const parsedSummary = await parseCsvFile(file)
 
+                // CSV에서 정상 좌표만 추출해 클러스터 분석 실행
+                const clusterInputPoints: ClusterInputPoint[] =
+                    parsedSummary.reportRows
+                        .filter((row) => row.isValid)
+                        .map((row) => ({
+                            id: String(row.rowIndex),
+                            latitude: Number(row.latitude),
+                            longitude: Number(row.longitude),
+                        }))
+
+                const analyzedClusters = analyzeClusters(clusterInputPoints)
+
                 setCsvSummary(parsedSummary)
+                setClusterResult(analyzedClusters)
                 setGeoJsonSummary(null)
             } catch (error) {
                 setSelectedFile(null)
@@ -221,6 +244,7 @@ export function FileUploadCard() {
         setSelectedRawFile(null)
         setBackendResult(null)
         setBackendGeoJsonResult(null)
+        setClusterResult(null)
         setIsBackendValidating(false)
     }
 
@@ -600,6 +624,48 @@ export function FileUploadCard() {
                         reportRows={csvSummary.reportRows}
                     />
 
+                    {/* CSV 정상 좌표 기반 공간 클러스터 분석 결과 */}
+                    {clusterResult && (
+                        <div className="mt-5 rounded-2xl border border-violet-200 bg-violet-50 p-4">
+                            <h4 className="font-semibold text-violet-900">
+                                Spatial Cluster Analysis
+                            </h4>
+
+                            <p className="mt-1 text-sm text-violet-700">
+                                정상 좌표를 대상으로 거리 기반 클러스터링을 수행한 결과입니다.
+                            </p>
+
+                            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                                <div className="rounded-xl bg-white p-4">
+                                    <p className="text-xs font-medium uppercase tracking-wide text-violet-500">
+                                        Cluster Count
+                                    </p>
+                                    <p className="mt-2 text-2xl font-black text-violet-900">
+                                        {clusterResult.clusterCount}
+                                    </p>
+                                </div>
+
+                                <div className="rounded-xl bg-white p-4">
+                                    <p className="text-xs font-medium uppercase tracking-wide text-violet-500">
+                                        Noise Points
+                                    </p>
+                                    <p className="mt-2 text-2xl font-black text-violet-900">
+                                        {clusterResult.noiseCount}
+                                    </p>
+                                </div>
+
+                                <div className="rounded-xl bg-white p-4">
+                                    <p className="text-xs font-medium uppercase tracking-wide text-violet-500">
+                                        Valid Points
+                                    </p>
+                                    <p className="mt-2 text-2xl font-black text-violet-900">
+                                        {clusterResult.points.length}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* 좌표 범위 오류가 있으면 오류 목록으로 표시 */}
                     {csvSummary.coordinateErrors.length > 0 && (
                         <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4">
@@ -630,10 +696,14 @@ export function FileUploadCard() {
                         </p>
                     )}
 
-                    {/* 정상 좌표만 지도에 표시 */}
+                    {/* 클러스터 결과를 지도에 표시 */}
                     {csvSummary.validFeatureCount > 0 && (
                         <GeoJsonPreviewMap
-                            geoJson={csvSummary.geoJson}
+                            geoJson={
+                                clusterResult
+                                    ? convertClusterResultToGeoJson(clusterResult)
+                                    : csvSummary.geoJson
+                            }
                             boundingBox={csvSummary.boundingBox}
                         />
                     )}

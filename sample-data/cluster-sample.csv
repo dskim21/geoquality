@@ -1,0 +1,7 @@
+id,name,district,latitude,longitude,category
+point-001,Cluster A 1,Seongdong-gu,37.5446,127.0374,park
+point-002,Cluster A 2,Seongdong-gu,37.5450,127.0380,park
+point-003,Cluster A 3,Seongdong-gu,37.5455,127.0385,park
+point-004,Cluster B 1,Jung-gu,37.5512,126.9882,park
+point-005,Cluster B 2,Jung-gu,37.5518,126.9888,park
+point-006,Noise Point,Songpa-gu,37.5125,127.1028,park
