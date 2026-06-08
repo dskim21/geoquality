@@ -1,15 +1,14 @@
-# GeoQuality
-
-> Spatial Data Quality Management Platform
-> GIS 품질검사, 이상치 탐지, 품질 점수화 및 BI 연계를 지원하는 공간데이터 품질관리 플랫폼
-
----
-
 ## 프로젝트 한 줄 소개
 
 GeoJSON 및 CSV 공간데이터의 품질을 자동 검증하고, 품질 점수화와 BI 리포팅까지 지원하는 GIS 데이터 품질관리 플랫폼
 
 ---
+
+## 결과 미리보기
+
+### GeoQuality BI Dashboard
+
+![GeoQuality BI Dashboard](./docs/images/geoquality-bi-dashboard.png)
 
 ## 프로젝트 배경
 
