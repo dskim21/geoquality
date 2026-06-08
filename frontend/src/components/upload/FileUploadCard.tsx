@@ -13,6 +13,8 @@ import { GeoJsonPreviewMap } from '../map/GeoJsonPreviewMap'
 import { downloadCsvQualityReport } from '../../utils/csvExport'
 import { QualityOverviewCards } from '../dashboard/QualityOverviewCards'
 import { ErrorTypeChart } from '../dashboard/ErrorTypeChart'
+import { GeoJsonQualityOverviewCards } from '../dashboard/GeoJsonQualityOverviewCards'
+import { validateCsvWithBackend, type BackendCsvValidationResult } from '../../api/validateApi'
 
 // 파일 확장자를 확인해서 지원 가능한 형식인지 검사
 function getFileExtension(fileName: string): SupportedFileType | null {
@@ -51,6 +53,32 @@ export function FileUploadCard() {
     // CSV 파일을 프론트에서 파싱한 요약 정보
     const [csvSummary, setCsvSummary] = useState<ParsedCsvSummary | null>(null)
 
+    // 백엔드로 전송할 원본 파일 객체
+    const [selectedRawFile, setSelectedRawFile] = useState<File | null>(null)
+
+    // FastAPI에서 반환한 CSV 검증 결과
+    const [backendResult, setBackendResult] =
+        useState<BackendCsvValidationResult
+            | null>(null)
+
+    // 백엔드 요청 중 로딩 상태
+    const [isBackendValidating, setIsBackendValidating] = useState(false)
+
+    // GeoJSON 오류 목록을 ErrorTypeChart에서 사용할 수 있는 형태로 변환
+    const geoJsonErrorRows = geoJsonSummary
+        ? [
+            ...geoJsonSummary.geometryErrors.map(() => ({
+                errorType: 'GEOMETRY_MISSING',
+            })),
+            ...geoJsonSummary.duplicateErrors.map(() => ({
+                errorType: 'DUPLICATE_GEOMETRY',
+            })),
+            ...geoJsonSummary.missingValueErrors.map(() => ({
+                errorType: 'MISSING_VALUE',
+            })),
+        ]
+        : []
+
     // 파일 선택 시 확장자 검사 후 파일 형식에 맞는 파서를 실행
     async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
         const file = event.target.files?.[0]
@@ -75,6 +103,9 @@ export function FileUploadCard() {
             type: fileType,
         })
         setErrorMessage('')
+
+        setSelectedRawFile(file)
+        setBackendResult(null)
 
         // GeoJSON / JSON 파일은 GeoJSON 파서로 분석
         if (fileType === 'geojson' || fileType === 'json') {
@@ -123,6 +154,35 @@ export function FileUploadCard() {
         setGeoJsonSummary(null)
         setCsvSummary(null)
         setErrorMessage('')
+        setSelectedRawFile(null)
+        setBackendResult(null)
+        setIsBackendValidating(false)
+    }
+
+    // 선택한 CSV 파일을 FastAPI 백엔드로 전송해 품질검사를 실행
+    async function handleBackendValidation() {
+        if (!selectedRawFile || selectedFile?.type !== 'csv') {
+            setErrorMessage('백엔드 검증은 CSV 파일에서만 실행할 수 있습니다.')
+            return
+        }
+
+        try {
+            setIsBackendValidating(true)
+            setErrorMessage('')
+
+            const result = await validateCsvWithBackend(selectedRawFile)
+
+            setBackendResult(result)
+        } catch (error) {
+            setBackendResult(null)
+            setErrorMessage(
+                error instanceof Error
+                    ? error.message
+                    : '백엔드 검증 중 오류가 발생했습니다.',
+            )
+        } finally {
+            setIsBackendValidating(false)
+        }
     }
 
     return (
@@ -205,6 +265,13 @@ export function FileUploadCard() {
                             Geometry 존재 여부를 기준으로 계산한 GeoJSON 데이터 품질 점수입니다.
                         </p>
                     </div>
+
+                    {/* GeoJSON 품질 요약 대시보드 */}
+                    <GeoJsonQualityOverviewCards
+                        geoJsonSummary={geoJsonSummary}
+                    />
+
+                    <ErrorTypeChart reportRows={geoJsonErrorRows} />
 
                     {/* GeoJSON에서 추출한 기본 메타데이터 */}
                     <div className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
@@ -448,6 +515,75 @@ export function FileUploadCard() {
                 </div>
             )}
 
+            {/* FastAPI 백엔드 검증 결과 */}
+            {backendResult && (
+                <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                    <h3 className="font-semibold text-emerald-800">
+                        FastAPI Validation Result
+                    </h3>
+
+                    <div className="mt-4 grid gap-3 text-sm sm:grid-cols-4">
+                        <div>
+                            <p className="text-xs text-emerald-700">Quality Score</p>
+                            <p className="mt-1 text-2xl font-black text-emerald-900">
+                                {backendResult.qualityScore}
+                            </p>
+                        </div>
+
+                        <div>
+                            <p className="text-xs text-emerald-700">Total Rows</p>
+                            <p className="mt-1 text-2xl font-black text-emerald-900">
+                                {backendResult.totalRows}
+                            </p>
+                        </div>
+
+                        <div>
+                            <p className="text-xs text-emerald-700">Valid Rows</p>
+                            <p className="mt-1 text-2xl font-black text-emerald-900">
+                                {backendResult.validRows}
+                            </p>
+                        </div>
+
+                        <div>
+                            <p className="text-xs text-emerald-700">Invalid Rows</p>
+                            <p className="mt-1 text-2xl font-black text-emerald-900">
+                                {backendResult.invalidRows}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* FastAPI가 탐지한 오류 상세 목록 */}
+                    {backendResult.errors.length > 0 && (
+                        <div className="mt-4 rounded-xl border border-emerald-200 bg-white p-4">
+                            <p className="text-sm font-semibold text-emerald-800">
+                                Backend Error Details
+                            </p>
+
+                            <div className="mt-3 space-y-2">
+                                {backendResult.errors.map((error) => (
+                                    <div
+                                        key={`${error.rowIndex}-${error.errorType}`}
+                                        className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm"
+                                    >
+                                        <p className="font-semibold text-emerald-900">
+                                            Row {error.rowIndex} · {error.errorType}
+                                        </p>
+
+                                        <p className="mt-1 text-emerald-700">
+                                            latitude: {error.latitude}, longitude: {error.longitude}
+                                        </p>
+
+                                        <p className="mt-1 text-xs text-emerald-600">
+                                            {error.message}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* 에러 메시지 */}
             {errorMessage && (
                 <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
@@ -458,11 +594,12 @@ export function FileUploadCard() {
             {/* 백엔드 연결 전까지는 선택된 파일 여부만 기준으로 버튼 활성화 */}
             <button
                 type="button"
-                disabled={!selectedFile}
+                onClick={handleBackendValidation}
+                disabled={!selectedFile || isBackendValidating}
                 className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-500 px-5 py-3 font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
             >
                 <PlayCircle className="h-5 w-5" />
-                품질검사 실행
+                {isBackendValidating ? '백엔드 검증 중...' : 'FastAPI 품질검사 실행'}
             </button>
         </div>
     )

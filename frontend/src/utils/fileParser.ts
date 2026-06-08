@@ -188,20 +188,35 @@ export async function parseGeoJsonFile(
         }
     })
 
-    const errorCount =
-        geometryErrors.length + duplicateErrors.length + missingValueErrors.length
+    // Rule-based Quality Scoring
+    const geometryPenalty =
+        geometryErrors.length * 30
 
-    // 오류 개수를 기준으로 품질 점수 계산
+    const duplicatePenalty =
+        duplicateErrors.length * 20
+
+    const missingValuePenalty =
+        missingValueErrors.length * 10
+
+    const totalPenalty =
+        geometryPenalty +
+        duplicatePenalty +
+        missingValuePenalty
+
     const qualityScore =
-        json.features.length > 0
-            ? Math.max(0, Math.round(100 - (errorCount / json.features.length) * 100))
-            : 0
+        Math.max(
+            0,
+            100 - totalPenalty,
+        )
 
     return {
         fileName: file.name,
         featureCount: json.features.length,
         validFeatureCount,
-        invalidFeatureCount: errorCount,
+        invalidFeatureCount:
+            geometryErrors.length +
+            duplicateErrors.length +
+            missingValueErrors.length,
         qualityScore,
         geometryTypes: Array.from(geometryTypes),
         propertyKeys: Array.from(propertyKeys),

@@ -1,0 +1,9 @@
+id,name,district,latitude,longitude,category
+point-001,Seoul Forest,Seongdong-gu,37.5446,127.0374,park
+point-002,Namsan Park,Jung-gu,37.5512,126.9882,park
+point-003,Invalid Point,Unknown,999,999,error
+point-004,Hangang Park,Yeongdeungpo-gu,37.5260,126.9349,park
+point-005,Wrong Latitude,Mapo-gu,120,126.9080,error
+point-006,Wrong Longitude,Jongno-gu,37.5729,300,error
+point-007,Children Park,Songpa-gu,37.5125,127.1028,park
+point-008,Empty District,,37.5665,126.9780,park
