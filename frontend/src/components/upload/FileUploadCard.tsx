@@ -15,8 +15,10 @@ import { QualityOverviewCards } from '../dashboard/QualityOverviewCards'
 import { ErrorTypeChart } from '../dashboard/ErrorTypeChart'
 import { GeoJsonQualityOverviewCards } from '../dashboard/GeoJsonQualityOverviewCards'
 import {
+    analyzeCsvClustersWithBackend,
     validateCsvWithBackend,
     validateGeoJsonWithBackend,
+    type BackendClusterAnalysisResult,
     type BackendCsvValidationResult,
     type BackendGeoJsonValidationResult,
 } from '../../api/validateApi'
@@ -78,6 +80,10 @@ export function FileUploadCard() {
 
     const [backendGeoJsonResult, setBackendGeoJsonResult] =
         useState<BackendGeoJsonValidationResult | null>(null)
+
+    // FastAPI scikit-learn DBSCAN 클러스터 분석 결과
+    const [backendClusterResult, setBackendClusterResult] =
+        useState<BackendClusterAnalysisResult | null>(null)
 
     // 백엔드 요청 중 로딩 상태
     const [isBackendValidating, setIsBackendValidating] = useState(false)
@@ -244,6 +250,7 @@ export function FileUploadCard() {
         setSelectedRawFile(null)
         setBackendResult(null)
         setBackendGeoJsonResult(null)
+        setBackendClusterResult(null)
         setClusterResult(null)
         setIsBackendValidating(false)
     }
@@ -260,8 +267,11 @@ export function FileUploadCard() {
             setErrorMessage('')
 
             const result = await validateCsvWithBackend(selectedRawFile)
+            const clusterAnalysisResult =
+                await analyzeCsvClustersWithBackend(selectedRawFile)
 
             setBackendResult(result)
+            setBackendClusterResult(clusterAnalysisResult)
         } catch (error) {
             setBackendResult(null)
             setErrorMessage(
@@ -785,6 +795,88 @@ export function FileUploadCard() {
                                         </p>
                                     </div>
                                 ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* FastAPI scikit-learn DBSCAN 클러스터 분석 결과 */}
+            {backendClusterResult && (
+                <div className="mt-5 rounded-2xl border border-violet-200 bg-violet-50 p-4">
+                    <h3 className="font-semibold text-violet-900">
+                        FastAPI DBSCAN Cluster Result
+                    </h3>
+
+                    <p className="mt-1 text-sm text-violet-700">
+                        scikit-learn DBSCAN을 사용해 정상 좌표의 공간 클러스터를 분석한 결과입니다.
+                    </p>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-xl bg-white p-4">
+                            <p className="text-xs font-medium uppercase tracking-wide text-violet-500">
+                                Total Points
+                            </p>
+                            <p className="mt-2 text-2xl font-black text-violet-900">
+                                {backendClusterResult.totalPoints}
+                            </p>
+                        </div>
+
+                        <div className="rounded-xl bg-white p-4">
+                            <p className="text-xs font-medium uppercase tracking-wide text-violet-500">
+                                Cluster Count
+                            </p>
+                            <p className="mt-2 text-2xl font-black text-violet-900">
+                                {backendClusterResult.clusterCount}
+                            </p>
+                        </div>
+
+                        <div className="rounded-xl bg-white p-4">
+                            <p className="text-xs font-medium uppercase tracking-wide text-violet-500">
+                                Noise Points
+                            </p>
+                            <p className="mt-2 text-2xl font-black text-violet-900">
+                                {backendClusterResult.noiseCount}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* 공간 이상치 리포트 */}
+                    {backendClusterResult.noiseCount > 0 && (
+                        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                            <h4 className="font-semibold text-amber-800">
+                                Spatial Outlier Report
+                            </h4>
+
+                            <p className="mt-1 text-sm text-amber-700">
+                                DBSCAN 군집에 포함되지 않은 공간 이상치입니다.
+                            </p>
+
+                            <div className="mt-3 space-y-2">
+                                {backendClusterResult.points
+                                    .filter((point) => point.isNoise)
+                                    .map((point) => (
+                                        <div
+                                            key={point.rowIndex}
+                                            className="rounded-lg bg-white p-3"
+                                        >
+                                            <p className="font-medium text-slate-900">
+                                                Point #{point.rowIndex}
+                                            </p>
+
+                                            <p className="mt-1 text-sm text-slate-600">
+                                                Latitude: {point.latitude}
+                                            </p>
+
+                                            <p className="text-sm text-slate-600">
+                                                Longitude: {point.longitude}
+                                            </p>
+
+                                            <span className="mt-2 inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
+                                                Spatial Outlier
+                                            </span>
+                                        </div>
+                                    ))}
                             </div>
                         </div>
                     )}

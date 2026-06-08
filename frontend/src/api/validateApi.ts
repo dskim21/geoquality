@@ -90,3 +90,47 @@ export async function validateGeoJsonWithBackend(
 
     return response.json()
 }
+
+export interface BackendClusterPoint {
+    rowIndex: number
+    latitude: number
+    longitude: number
+    name: string
+    clusterId: number
+    isNoise: boolean
+}
+
+export interface BackendClusterAnalysisResult {
+    totalPoints: number
+    clusterCount: number
+    noiseCount: number
+    points: BackendClusterPoint[]
+}
+
+// CSV 파일을 FastAPI 백엔드로 전송해 scikit-learn DBSCAN 클러스터 분석 실행
+export async function analyzeCsvClustersWithBackend(
+    file: File,
+): Promise<BackendClusterAnalysisResult> {
+    const formData = new FormData()
+
+    formData.append('file', file)
+
+    const response = await fetch(
+        `${API_BASE_URL}/api/validate/csv/clusters`,
+        {
+            method: 'POST',
+            body: formData,
+        },
+    )
+
+    if (!response.ok) {
+        const errorBody = await response.json().catch(() => null)
+
+        throw new Error(
+            errorBody?.detail ??
+            'CSV 클러스터 분석 요청 중 오류가 발생했습니다.',
+        )
+    }
+
+    return response.json()
+}
