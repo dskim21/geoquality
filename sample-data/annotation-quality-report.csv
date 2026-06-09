@@ -1,0 +1,3 @@
+annotationIndex,errorType,severity,message,qualityScore
+"2","EMPTY_LABEL","High","Annotation 2: Label이 비어 있습니다.","33"
+"3","INVALID_BBOX","High","Annotation 3: Bounding Box 크기가 올바르지 않습니다.","33"

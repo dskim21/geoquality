@@ -17,10 +17,14 @@ import { GeoJsonQualityOverviewCards } from '../dashboard/GeoJsonQualityOverview
 import {
     analyzeCsvClustersWithBackend,
     validateCsvWithBackend,
+    validateCvatWithBackend,
     validateGeoJsonWithBackend,
+    validateLabelMeWithBackend,
     type BackendClusterAnalysisResult,
     type BackendCsvValidationResult,
     type BackendGeoJsonValidationResult,
+    type CvatValidationResult,
+    type LabelMeValidationResult,
 } from '../../api/validateApi'
 import {
     analyzeClusters,
@@ -28,12 +32,13 @@ import {
     type ClusterAnalysisResult,
     type ClusterInputPoint,
 } from '../../utils/spatialCluster'
+import { exportAnnotationReportCsv } from '../../utils/exportAnnotationReportCsv'
 
 // 파일 확장자를 확인해서 지원 가능한 형식인지 검사
 function getFileExtension(fileName: string): SupportedFileType | null {
     const extension = fileName.split('.').pop()?.toLowerCase()
 
-    if (extension === 'geojson' || extension === 'json' || extension === 'csv') {
+    if (extension === 'geojson' || extension === 'json' || extension === 'csv' || extension === 'xml') {
         return extension
     }
 
@@ -84,6 +89,12 @@ export function FileUploadCard() {
     // FastAPI scikit-learn DBSCAN 클러스터 분석 결과
     const [backendClusterResult, setBackendClusterResult] =
         useState<BackendClusterAnalysisResult | null>(null)
+
+    const [labelMeResult, setLabelMeResult] =
+        useState<LabelMeValidationResult | null>(null)
+
+    const [cvatResult, setCvatResult] =
+        useState<CvatValidationResult | null>(null)
 
     // 백엔드 요청 중 로딩 상태
     const [isBackendValidating, setIsBackendValidating] = useState(false)
@@ -186,9 +197,14 @@ export function FileUploadCard() {
 
         setSelectedRawFile(file)
         setBackendResult(null)
+        setBackendGeoJsonResult(null)
+        setBackendClusterResult(null)
+        setLabelMeResult(null)
+        setCvatResult(null)
 
-        // GeoJSON / JSON 파일은 GeoJSON 파서로 분석
-        if (fileType === 'geojson' || fileType === 'json') {
+        // .geojson 파일만 GeoJSON 파서로 분석
+        // .json 파일은 LabelMe JSON일 수 있으므로 로컬 GeoJSON 파싱을 건너뜀
+        if (fileType === 'geojson') {
             try {
                 const parsedSummary = await parseGeoJsonFile(file)
 
@@ -205,6 +221,23 @@ export function FileUploadCard() {
                 )
             }
 
+            return
+        }
+
+        // LabelMe JSON은 FastAPI Validation에서 검사하므로
+        // 업로드 단계에서는 파일 정보만 유지
+        if (fileType === 'json') {
+            setGeoJsonSummary(null)
+            setCsvSummary(null)
+            setClusterResult(null)
+            return
+        }
+
+        // xml 파일 처리
+        if (fileType === 'xml') {
+            setGeoJsonSummary(null)
+            setCsvSummary(null)
+            setClusterResult(null)
             return
         }
 
@@ -253,6 +286,8 @@ export function FileUploadCard() {
         setBackendClusterResult(null)
         setClusterResult(null)
         setIsBackendValidating(false)
+        setLabelMeResult(null)
+        setCvatResult(null)
     }
 
     // 선택한 CSV 파일을 FastAPI 백엔드로 전송해 품질검사를 실행
@@ -313,6 +348,58 @@ export function FileUploadCard() {
         }
     }
 
+    async function handleLabelMeValidation() {
+        if (!selectedRawFile) {
+            setErrorMessage('LabelMe 파일을 선택해주세요.')
+            return
+        }
+
+        try {
+            setIsBackendValidating(true)
+            setErrorMessage('')
+
+            const result = await validateLabelMeWithBackend(selectedRawFile)
+
+            setLabelMeResult(result)
+        } catch (error) {
+            setLabelMeResult(null)
+
+            setErrorMessage(
+                error instanceof Error
+                    ? error.message
+                    : 'LabelMe 품질검사 중 오류가 발생했습니다.',
+            )
+        } finally {
+            setIsBackendValidating(false)
+        }
+    }
+
+    async function handleCvatValidation() {
+        if (!selectedRawFile) {
+            setErrorMessage('CVAT XML 파일을 선택해주세요.')
+            return
+        }
+
+        try {
+            setIsBackendValidating(true)
+            setErrorMessage('')
+
+            const result = await validateCvatWithBackend(selectedRawFile)
+
+            setCvatResult(result)
+        } catch (error) {
+            setCvatResult(null)
+
+            setErrorMessage(
+                error instanceof Error
+                    ? error.message
+                    : 'CVAT 품질검사 중 오류가 발생했습니다.',
+            )
+        } finally {
+            setIsBackendValidating(false)
+        }
+    }
+
     return (
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             {/* 카드 헤더 */}
@@ -335,12 +422,12 @@ export function FileUploadCard() {
                     파일을 선택하거나 여기에 드래그하세요
                 </p>
                 <p className="mt-2 text-xs text-slate-400">
-                    지원 형식: .geojson, .json, .csv
+                    지원 형식: .geojson, .json, .csv, .xml
                 </p>
 
                 <input
                     type="file"
-                    accept=".geojson,.json,.csv"
+                    accept=".geojson,.json,.csv,.xml"
                     onChange={handleFileChange}
                     className="mt-5 block w-full cursor-pointer rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-600 file:mr-4 file:rounded-full file:border-0 file:bg-sky-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-sky-600"
                 />
@@ -872,9 +959,19 @@ export function FileUploadCard() {
                                                 Longitude: {point.longitude}
                                             </p>
 
-                                            <span className="mt-2 inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
-                                                Spatial Outlier
-                                            </span>
+                                            <div className="mt-2 flex flex-wrap gap-2">
+                                                <span className="inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
+                                                    Spatial Outlier
+                                                </span>
+
+                                                <span className="inline-flex rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">
+                                                    Severity: {point.severity}
+                                                </span>
+                                            </div>
+
+                                            <p className="mt-2 text-xs text-slate-500">
+                                                Reason: {point.reason}
+                                            </p>
                                         </div>
                                     ))}
                             </div>
@@ -933,6 +1030,270 @@ export function FileUploadCard() {
                 </div>
             )}
 
+            {
+                labelMeResult && (
+                    <div className="mt-5 rounded-2xl border border-fuchsia-200 bg-fuchsia-50 p-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="font-semibold text-fuchsia-900">
+                                LabelMe Annotation Quality Result
+                            </h3>
+
+                            <button
+                                type="button"
+                                onClick={() => exportAnnotationReportCsv(labelMeResult)}
+                                className="rounded-lg bg-fuchsia-600 px-3 py-2 text-xs font-semibold text-white hover:bg-fuchsia-700"
+                            >
+                                Export CSV
+                            </button>
+                        </div>
+
+                        <p className="mt-1 text-sm text-fuchsia-700">
+                            AI 학습데이터 라벨링 결과의 Annotation 품질검사 결과입니다.
+                        </p>
+
+                        <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                            <div className="rounded-xl bg-white p-4">
+                                <p className="min-h-[32px] text-xs font-medium uppercase tracking-wide text-fuchsia-500">
+                                    Quality Score
+                                </p>
+                                <p className="mt-2 text-2xl font-black text-fuchsia-900">
+                                    {labelMeResult.qualityScore}
+                                </p>
+                            </div>
+
+                            <div className="rounded-xl bg-white p-4">
+                                <p className="min-h-[32px] text-xs font-medium uppercase tracking-wide text-fuchsia-500">
+                                    Total Annotations
+                                </p>
+                                <p className="mt-2 text-2xl font-black text-fuchsia-900">
+                                    {labelMeResult.totalAnnotations}
+                                </p>
+                            </div>
+
+                            <div className="rounded-xl bg-white p-4">
+                                <p className="min-h-[32px] text-xs font-medium uppercase tracking-wide text-fuchsia-500">
+                                    Valid
+                                </p>
+                                <p className="mt-2 text-2xl font-black text-fuchsia-900">
+                                    {labelMeResult.validAnnotations}
+                                </p>
+                            </div>
+
+                            <div className="rounded-xl bg-white p-4">
+                                <p className="min-h-[32px] text-xs font-medium uppercase tracking-wide text-fuchsia-500">
+                                    Invalid
+                                </p>
+                                <p className="mt-2 text-2xl font-black text-fuchsia-900">
+                                    {labelMeResult.invalidAnnotations}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Annotation 클래스 통계 */}
+                        <div className="mt-4 rounded-xl border border-fuchsia-200 bg-white p-4">
+                            <p className="text-sm font-semibold text-fuchsia-900">
+                                Annotation Statistics
+                            </p>
+
+                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                <div className="rounded-lg bg-fuchsia-50 p-3">
+                                    <p className="min-h-[32px] text-xs font-medium uppercase tracking-wide text-fuchsia-500">
+                                        Class Count
+                                    </p>
+                                    <p className="mt-2 text-2xl font-black text-fuchsia-900">
+                                        {labelMeResult.statistics.classCount}
+                                    </p>
+                                </div>
+
+                                <div className="rounded-lg bg-fuchsia-50 p-3">
+                                    <p className="min-h-[32px] text-xs font-medium uppercase tracking-wide text-fuchsia-500">
+                                        Most Frequent Class
+                                    </p>
+                                    <p className="mt-2 text-2xl font-black text-fuchsia-900">
+                                        {labelMeResult.statistics.mostFrequentClass ?? '-'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="mt-4 space-y-2">
+                                {Object.entries(labelMeResult.statistics.classCounts).map(
+                                    ([className, count]) => (
+                                        <div
+                                            key={className}
+                                            className="flex items-center justify-between rounded-lg bg-fuchsia-50 px-3 py-2 text-sm"
+                                        >
+                                            <span className="font-medium text-fuchsia-900">
+                                                {className}
+                                            </span>
+                                            <span className="font-semibold text-fuchsia-700">
+                                                {count}
+                                            </span>
+                                        </div>
+                                    ),
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 클래스 불균형 감지 결과 */}
+                        {labelMeResult.statistics.imbalanceDetected && (
+                            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                                <p className="text-sm font-semibold text-amber-800">
+                                    Dataset Quality Warning
+                                </p>
+
+                                <p className="mt-2 text-sm text-amber-700">
+                                    특정 클래스가 전체 Annotation의 대부분을 차지하고 있습니다.
+                                    AI 학습데이터 편향 가능성이 있습니다.
+                                </p>
+
+                                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                    <div className="rounded-lg bg-white p-3">
+                                        <p className="text-xs font-medium uppercase tracking-wide text-amber-500">
+                                            Majority Class
+                                        </p>
+
+                                        <p className="mt-2 text-2xl font-black text-amber-900">
+                                            {labelMeResult.statistics.mostFrequentClass}
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-lg bg-white p-3">
+                                        <p className="text-xs font-medium uppercase tracking-wide text-amber-500">
+                                            Majority Ratio
+                                        </p>
+
+                                        <p className="mt-2 text-2xl font-black text-amber-900">
+                                            {labelMeResult.statistics.majorityRatio}%
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {labelMeResult.errors.length > 0 && (
+                            <div className="mt-4 rounded-xl border border-fuchsia-200 bg-white p-4">
+                                <p className="text-sm font-semibold text-fuchsia-900">
+                                    Annotation Error Report
+                                </p>
+
+                                <div className="mt-3 space-y-2">
+                                    {labelMeResult.errors.map((error) => (
+                                        <div
+                                            key={`${error.annotationIndex}-${error.errorType}`}
+                                            className="rounded-lg border border-fuchsia-100 bg-fuchsia-50 px-3 py-2 text-sm"
+                                        >
+                                            <p className="font-semibold text-fuchsia-900">
+                                                Annotation #{error.annotationIndex} · {error.errorType}
+                                            </p>
+
+                                            <p className="mt-1 text-xs font-semibold text-red-600">
+                                                Severity: {error.severity}
+                                            </p>
+
+                                            <p className="mt-1 text-fuchsia-700">
+                                                {error.message}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )
+            }
+
+            {/* CVAT XML Annotation 품질검사 결과 */}
+            {cvatResult && (
+                <div className="mt-5 rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
+                    <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-indigo-900">
+                            CVAT Annotation Quality Result
+                        </h3>
+
+                        <button
+                            type="button"
+                            onClick={() => exportAnnotationReportCsv(cvatResult)}
+                            className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700"
+                        >
+                            Export CSV
+                        </button>
+                    </div>
+
+                    <p className="mt-1 text-sm text-indigo-700">
+                        CVAT XML 라벨링 결과의 Annotation 품질검사 결과입니다.
+                    </p>
+
+                    {/* CVAT 품질 점수 요약 */}
+                    <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                        <div className="rounded-xl bg-white p-4">
+                            <p className="min-h-[32px] text-xs font-medium uppercase tracking-wide text-indigo-500">
+                                Quality Score
+                            </p>
+                            <p className="mt-2 text-2xl font-black text-indigo-900">
+                                {cvatResult.qualityScore}
+                            </p>
+                        </div>
+
+                        <div className="rounded-xl bg-white p-4">
+                            <p className="min-h-[32px] text-xs font-medium uppercase tracking-wide text-indigo-500">
+                                Total Annotations
+                            </p>
+                            <p className="mt-2 text-2xl font-black text-indigo-900">
+                                {cvatResult.totalAnnotations}
+                            </p>
+                        </div>
+
+                        <div className="rounded-xl bg-white p-4">
+                            <p className="min-h-[32px] text-xs font-medium uppercase tracking-wide text-indigo-500">
+                                Valid
+                            </p>
+                            <p className="mt-2 text-2xl font-black text-indigo-900">
+                                {cvatResult.validAnnotations}
+                            </p>
+                        </div>
+
+                        <div className="rounded-xl bg-white p-4">
+                            <p className="min-h-[32px] text-xs font-medium uppercase tracking-wide text-indigo-500">
+                                Invalid
+                            </p>
+                            <p className="mt-2 text-2xl font-black text-indigo-900">
+                                {cvatResult.invalidAnnotations}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* CVAT Annotation 오류 상세 목록 */}
+                    {cvatResult.errors.length > 0 && (
+                        <div className="mt-4 rounded-xl border border-indigo-200 bg-white p-4">
+                            <p className="text-sm font-semibold text-indigo-900">
+                                CVAT Error Report
+                            </p>
+
+                            <div className="mt-3 space-y-2">
+                                {cvatResult.errors.map((error) => (
+                                    <div
+                                        key={`${error.annotationIndex}-${error.errorType}`}
+                                        className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm"
+                                    >
+                                        <p className="font-semibold text-indigo-900">
+                                            Annotation #{error.annotationIndex} · {error.errorType}
+                                        </p>
+
+                                        <p className="mt-1 text-xs font-semibold text-red-600">
+                                            Severity: {error.severity}
+                                        </p>
+
+                                        <p className="mt-1 text-indigo-700">
+                                            {error.message}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* 에러 메시지 */}
             {errorMessage && (
                 <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
@@ -949,8 +1310,19 @@ export function FileUploadCard() {
                             return
                         }
 
-                        if (selectedFile?.type === 'geojson' || selectedFile?.type === 'json') {
+                        if (selectedFile?.type === 'geojson') {
                             handleGeoJsonBackendValidation()
+                            return
+                        }
+
+                        if (selectedFile?.type === 'json') {
+                            handleLabelMeValidation()
+                            return
+                        }
+
+                        if (selectedFile?.type === 'xml') {
+                            handleCvatValidation()
+                            return
                         }
                     }}
                     disabled={!selectedFile || isBackendValidating}

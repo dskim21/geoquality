@@ -98,6 +98,8 @@ export interface BackendClusterPoint {
     name: string
     clusterId: number
     isNoise: boolean
+    severity: string
+    reason: string
 }
 
 export interface BackendClusterAnalysisResult {
@@ -129,6 +131,101 @@ export async function analyzeCsvClustersWithBackend(
         throw new Error(
             errorBody?.detail ??
             'CSV 클러스터 분석 요청 중 오류가 발생했습니다.',
+        )
+    }
+
+    return response.json()
+}
+
+export interface LabelMeValidationResult {
+    qualityScore: number
+    totalAnnotations: number
+    validAnnotations: number
+    invalidAnnotations: number
+    statistics: {
+        classCounts: Record<string, number>
+        classCount: number
+        mostFrequentClass: string | null
+        majorityRatio: number
+        imbalanceDetected: boolean
+    }
+    errorTypes: {
+        emptyLabel: number
+        invalidPolygon: number
+        emptyAnnotation: number
+    }
+
+    errors: {
+        annotationIndex: number
+        errorType: string
+        severity: string
+        message: string
+    }[]
+}
+
+export interface LabelMeValidationResult {
+    qualityScore: number
+    totalAnnotations: number
+    validAnnotations: number
+    invalidAnnotations: number
+
+    errorTypes: {
+        emptyLabel: number
+        invalidPolygon: number
+        emptyAnnotation: number
+    }
+
+    errors: {
+        annotationIndex: number
+        errorType: string
+        severity: string
+        message: string
+    }[]
+}
+
+// LabelMe JSON 파일을 FastAPI 백엔드로 전송해 Annotation 품질검사 실행
+export async function validateLabelMeWithBackend(
+    file: File,
+): Promise<LabelMeValidationResult> {
+    const formData = new FormData()
+
+    formData.append('file', file)
+
+    const response = await fetch(`${API_BASE_URL}/api/annotation/labelme`, {
+        method: 'POST',
+        body: formData,
+    })
+
+    if (!response.ok) {
+        const errorBody = await response.json().catch(() => null)
+
+        throw new Error(
+            errorBody?.detail ?? 'LabelMe 품질검사 요청 중 오류가 발생했습니다.',
+        )
+    }
+
+    return response.json()
+}
+
+export type CvatValidationResult = LabelMeValidationResult
+
+export async function validateCvatWithBackend(
+    file: File,
+): Promise<CvatValidationResult> {
+    const formData = new FormData()
+
+    formData.append('file', file)
+
+    const response = await fetch(`${API_BASE_URL}/api/annotation/cvat`, {
+        method: 'POST',
+        body: formData,
+    })
+
+    if (!response.ok) {
+        const errorBody = await response.json().catch(() => null)
+
+        throw new Error(
+            errorBody?.detail ?? 'CVAT 품질검사 요청 중 오류가 발생했습니다.',
         )
     }
 

@@ -1,0 +1,35 @@
+{
+  "version": "5.0.1",
+  "imagePath": "dog.jpg",
+  "imageHeight": 720,
+  "imageWidth": 1280,
+  "shapes": [
+    {
+      "label": "dog",
+      "shape_type": "polygon",
+      "points": [
+        [300, 200],
+        [500, 220],
+        [520, 400],
+        [280, 390]
+      ]
+    },
+    {
+      "label": "",
+      "shape_type": "polygon",
+      "points": [
+        [800, 300],
+        [900, 320],
+        [920, 450],
+        [780, 430]
+      ]
+    },
+    {
+      "label": "person",
+      "shape_type": "polygon",
+      "points": [
+        [100, 100]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<annotations>
+    <image id="0" name="street.jpg" width="1280" height="720">
+
+        <box
+            label="car"
+            xtl="100"
+            ytl="100"
+            xbr="200"
+            ybr="200" />
+
+        <box
+            label=""
+            xtl="250"
+            ytl="120"
+            xbr="350"
+            ybr="220" />
+
+        <box
+            label="person"
+            xtl="400"
+            ytl="300"
+            xbr="400"
+            ybr="450" />
+
+    </image>
+</annotations>

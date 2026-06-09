@@ -1,0 +1,28 @@
+{
+  "version": "5.0.1",
+  "imagePath": "dog.jpg",
+  "imageHeight": 720,
+  "imageWidth": 1280,
+  "shapes": [
+    {
+      "label": "dog",
+      "shape_type": "polygon",
+      "points": [[300, 200], [500, 220], [520, 400], [280, 390]]
+    },
+    {
+      "label": "dg",
+      "shape_type": "polygon",
+      "points": [[100, 100], [200, 100], [200, 200], [100, 200]]
+    },
+    {
+      "label": "person",
+      "shape_type": "polygon",
+      "points": [[1400, 100], [1500, 100], [1500, 200], [1400, 200]]
+    },
+    {
+      "label": "car",
+      "shape_type": "polygon",
+      "points": [[100, 100], [200, 200], [300, 300]]
+    }
+  ]
+}

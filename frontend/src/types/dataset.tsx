@@ -1,6 +1,6 @@
 // frontend/src/types/dataset.tsx
 
-export type SupportedFileType = 'geojson' | 'json' | 'csv'
+export type SupportedFileType = 'geojson' | 'json' | 'csv' | 'xml'
 
 export interface SelectedDatasetFile {
     name: string
